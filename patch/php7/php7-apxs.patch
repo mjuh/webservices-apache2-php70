@@ -1,0 +1,32 @@
+commit 92902fef1d5ddaafa80593b7d836c18d2a3f3977
+Author: Oleg Pykhalov <go.wigust@gmail.com>
+Date:   Tue Jul 30 11:18:35 2019 +0300
+
+    apxs
+
+diff --git a/configure b/configure
+index b611676..071f59d 100755
+--- a/configure
++++ b/configure
+@@ -6240,7 +6240,7 @@ IFS="- /.
+     as_fn_error $? "Please note that Apache version >= 2.0.44 is required" "$LINENO" 5
+   fi
+ 
+-  APXS_LIBEXECDIR='$(INSTALL_ROOT)'`$APXS -q LIBEXECDIR`
++  APXS_LIBEXECDIR="$prefix/modules"
+   if test -z `$APXS -q SYSCONFDIR`; then
+     INSTALL_IT="\$(mkinstalldirs) '$APXS_LIBEXECDIR' && \
+                  $APXS -S LIBEXECDIR='$APXS_LIBEXECDIR' \
+diff --git a/sapi/apache2handler/config.m4 b/sapi/apache2handler/config.m4
+index 2e64b21..9ca6802 100644
+--- a/sapi/apache2handler/config.m4
++++ b/sapi/apache2handler/config.m4
+@@ -66,7 +66,7 @@ if test "$PHP_APXS2" != "no"; then
+     AC_MSG_ERROR([Please note that Apache version >= 2.0.44 is required])
+   fi
+ 
+-  APXS_LIBEXECDIR='$(INSTALL_ROOT)'`$APXS -q LIBEXECDIR`
++  APXS_LIBEXECDIR="$prefix/modules"
+   if test -z `$APXS -q SYSCONFDIR`; then
+     INSTALL_IT="\$(mkinstalldirs) '$APXS_LIBEXECDIR' && \
+                  $APXS -S LIBEXECDIR='$APXS_LIBEXECDIR' \

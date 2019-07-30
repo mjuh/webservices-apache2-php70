@@ -11,7 +11,7 @@ let
 
 inherit (builtins) concatMap getEnv toJSON;
 inherit (dockerTools) buildLayeredImage;
-inherit (lib) concatMapStringsSep firstNChars flattenSet dockerRunCmd;
+inherit (lib) concatMapStringsSep firstNChars flattenSet dockerRunCmd mkRootfs;
 inherit (stdenv) mkDerivation;
 
   locale = glibcLocales.override {
@@ -19,23 +19,16 @@ inherit (stdenv) mkDerivation;
       locales = ["en_US.UTF-8/UTF-8"];
   };
 
-  phpioncubepack = stdenv.mkDerivation rec {
-      name = "phpioncubepack";
-      src =  fetchurl {
-          url = "https://downloads.ioncube.com/loader_downloads/ioncube_loaders_lin_x86-64.tar.gz";
-          sha256 = "08bq06yr29zns53m603yv5h11ija8vzkq174qhcj4hz7ya05zb4a";
-      };
-      installPhase = ''
-                  mkdir -p  $out/
-                  tar zxvf  ${src} -C $out/ ioncube/ioncube_loader_lin_7.1.so
-      '';
-  };
-
-  php71 = stdenv.mkDerivation rec {
-      name = "php-7.1.30";
-      sha256 = "664850774fca19d2710b9aa35e9ae91214babbde9cd8d27fd3479cc97171ecb3";
+  php70 = stdenv.mkDerivation rec {
+      version = "7.0.33";
+      name = "php-${version}";
+      sha256 = "4933ea74298a1ba046b0246fe3771415c84dfb878396201b56cb5333abe86f07";
       enableParallelBuilding = true;
       nativeBuildInputs = [ pkgconfig autoconf ];
+      patches = [
+        ./patch/php7/fix-paths-php7.patch
+        ./patch/php7/php7-apxs.patch
+      ];
 
       buildInputs = [
          autoconf
@@ -49,7 +42,7 @@ inherit (stdenv) mkDerivation;
          freetype
          gettext
          gmp
-         icu
+         icu58
          libzip
          libjpeg
          libmcrypt
@@ -57,7 +50,6 @@ inherit (stdenv) mkDerivation;
          libpng
          libxml2
          libsodium
-         icu.dev
          xorg.libXpm.dev
          libxslt
          mariadb
@@ -153,6 +145,9 @@ inherit (stdenv) mkDerivation;
             --replace '@PHP_LDFLAGS@' ""
         done
 
+        substituteInPlace ext/tidy/tidy.c \
+            --replace buffio.h tidybuffio.h
+
         [[ -z "$libxml2" ]] || addToSearchPath PATH $libxml2/bin
 
         export EXTENSION_DIR=$out/lib/php/extensions
@@ -172,25 +167,24 @@ inherit (stdenv) mkDerivation;
       '';
 
       src = fetchurl {
-             url = "https://www.php.net/distributions/php-7.1.30.tar.bz2";
+             url = "https://www.php.net/distributions/${name}.tar.bz2";
              inherit sha256;
       };
 
-      patches = [ ./patch/php7/fix-paths-php7.patch ];
       stripDebugList = "bin sbin lib modules";
       outputs = [ "out" "dev" ];
       doCheck = false;
       checkTarget = "test"; 
   };
 
-  php71Packages.redis = stdenv.mkDerivation rec {
+  php70Packages.redis = stdenv.mkDerivation rec {
       name = "redis-4.2.0";
       src = fetchurl {
           url = "http://pecl.php.net/get/${name}.tgz";
           sha256 = "7655d88addda89814ad2131e093662e1d88a8c010a34d83ece5b9ff45d16b380";
       };  
       nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php71 ];
+      buildInputs = [ php70 ];
       makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
       autoreconfPhase = "phpize";  
       postInstall = ''
@@ -199,14 +193,14 @@ inherit (stdenv) mkDerivation;
       '';
   };
 
-  php71Packages.timezonedb = stdenv.mkDerivation rec {
+  php70Packages.timezonedb = stdenv.mkDerivation rec {
       name = "timezonedb-2019.1";
       src = fetchurl {
           url = "http://pecl.php.net/get/${name}.tgz";
           sha256 = "0rrxfs5izdmimww1w9khzs9vcmgi1l90wni9ypqdyk773cxsn725";
       };
       nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php71 ];
+      buildInputs = [ php70 ];
       makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
       autoreconfPhase = "phpize";
       postInstall = ''
@@ -215,14 +209,14 @@ inherit (stdenv) mkDerivation;
       '';
   };
 
-  php71Packages.rrd = stdenv.mkDerivation rec {
+  php70Packages.rrd = stdenv.mkDerivation rec {
       name = "rrd-2.0.1";
       src = fetchurl {
           url = "http://pecl.php.net/get/${name}.tgz";
           sha256 = "39f5ae515de003d8dad6bfd77db60f5bd5b4a9f6caa41479b1b24b0d6592715d";
       };
       nativeBuildInputs = [ autoreconfHook pkgconfig ] ;
-      buildInputs = [ php71 rrdtool ];
+      buildInputs = [ php70 rrdtool ];
       makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
       autoreconfPhase = "phpize";
       postInstall = ''
@@ -232,14 +226,14 @@ inherit (stdenv) mkDerivation;
   };
 
 
-  php71Packages.memcached = stdenv.mkDerivation rec {
+  php70Packages.memcached = stdenv.mkDerivation rec {
       name = "memcached-3.1.3";
       src = fetchurl {
           url = "http://pecl.php.net/get/${name}.tgz";
           sha256 = "20786213ff92cd7ebdb0d0ac10dde1e9580a2f84296618b666654fd76ea307d4";
       };
       nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php71 pkg-config zlib libmemcached ];
+      buildInputs = [ php70 pkg-config zlib libmemcached ];
       makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
       configureFlags = ''
           --with-zlib-dir=${zlib.dev}
@@ -252,14 +246,14 @@ inherit (stdenv) mkDerivation;
       '';
   };
 
-  php71Packages.imagick = stdenv.mkDerivation rec {
+  php70Packages.imagick = stdenv.mkDerivation rec {
       name = "imagick-3.4.3";
       src = fetchurl {
           url = "http://pecl.php.net/get/${name}.tgz";
           sha256 = "1f3c5b5eeaa02800ad22f506cd100e8889a66b2ec937e192eaaa30d74562567c";
       };
       nativeBuildInputs = [ autoreconfHook pkgconfig ] ;
-      buildInputs = [ php71 imagemagick pcre ];
+      buildInputs = [ php70 imagemagick pcre ];
       makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
       configureFlags = [ "--with-imagick=${pkgs.imagemagick.dev}" ];
       autoreconfPhase = "phpize";
@@ -269,75 +263,41 @@ inherit (stdenv) mkDerivation;
       '';
   };
 
-  rootfs = stdenv.mkDerivation rec {
-      nativeBuildInputs = [ 
-         mjHttpErrorPages
-         phpioncubepack
-         php71
-         php71Packages.rrd
-         php71Packages.redis
-         php71Packages.timezonedb
-         php71Packages.memcached
-         php71Packages.imagick
-         bash
-         apacheHttpd
-         apacheHttpdmpmITK
-         execline
-         s6
-         s6-portable-utils
-         coreutils
-         findutils
-         postfix
-         perl
-         gnugrep
-         curl
-      ];
-      name = "rootfs";
+
+  rootfs = mkRootfs {
+      name = "apache2-php70-rootfs";
       src = ./rootfs;
-      buildPhase = ''
-         echo $nativeBuildInputs
-         export coreutils="${coreutils}"
-         export bash="${bash}"
-         export curl="${curl}"
-         export findutils="${findutils}"
-         export rootfs="$out"
-         export apacheHttpdmpmITK="${apacheHttpdmpmITK}"
-         export apacheHttpd="${apacheHttpd}"
-         export s6portableutils="${s6-portable-utils}"
-         export phpioncubepack="${phpioncubepack}"
-         export php71="${php71}"
-         export mjerrors="${mjHttpErrorPages}"
-         export postfix="${postfix}"
-         export libstdcxx="${gcc-unwrapped.lib}"
-         echo ${apacheHttpd}
-         for file in $(find $src/ -type f)
-         do
-           echo $file
-           substituteAllInPlace $file
-         done
-      '';
-      installPhase = ''
-         cp -pr ${src} $out/
-      '';
+      inherit curl coreutils findutils apacheHttpdmpmITK apacheHttpd mjHttpErrorPages php70 postfix s6 execline;
+      ioncube = ioncube.v70;
+      s6PortableUtils = s6-portable-utils;
+      s6LinuxUtils = s6-linux-utils;
+      mimeTypes = mime-types;
+      libstdcxx = gcc-unwrapped.lib;
   };
 
 dockerArgHints = {
     init = false;
     read_only = true;
     network = "host";
-    environment = { HTTPD_PORT = "\$socket_http_port"; PHP_SEC = "\$security_level"; PHP_INI_SCAN_DIR = ":${rootfs}/etc/phpsec/$security_level";} ;
-
-##TO DO:
-##? -v $(pwd)/postfix-conf-test:/etc/postfix:ro ?
-#? ({ type = "bind"; source = "/etc/passwd"; destination = "/etc/passwd"; readonly = true; })
-#? ({ type = "bind"; source = "/etc/group"; destination = "/etc/group"; readonly = true; })
-    tmpfs = [ "/tmp:mode=1777" ];
+    environment = { HTTPD_PORT = "$SOCKET_HTTP_PORT"; PHP_INI_SCAN_DIR = ":${rootfs}/etc/phpsec/$SECURITY_LEVEL"; };
+    tmpfs = [
+      "/tmp:mode=1777"
+      "/run/bin:exec,suid"
+    ];
+    ulimits = [
+      { name = "stack"; hard = -1; soft = -1; }
+    ];
+    security_opt = [ "apparmor:unconfined" ];
+    cap_add = [ "SYS_ADMIN" ];
     volumes = [
-      ({ type = "bind"; source =  "\$sites_conf_path" ; target = "/read/sites-enabled"; read_only = true; })
-      ({ type = "bind"; source = "/opcache"; target = "/opcache"; read_only = false; })
-      ({ type = "bind"; source = "/home"; target = "/home"; read_only = false; })
-      ({ type = "bind"; source = "/var/spool/postfix"; target = "/var/spool/postfix"; read_only = false; })
-      ({ type = "bind"; source = "/var/lib/postfix"; target = "/var/lib/postfix"; read_only = false; })
+      ({ type = "bind"; source =  "$SITES_CONF_PATH" ; target = "/read/sites-enabled"; read_only = true; })
+      ({ type = "bind"; source =  "/etc/passwd" ; target = "/etc/passwd"; read_only = true; })
+      ({ type = "bind"; source =  "/etc/group" ; target = "/etc/group"; read_only = true; })
+      ({ type = "bind"; source = "/opcache"; target = "/opcache"; })
+      ({ type = "bind"; source = "/home"; target = "/home"; })
+      ({ type = "bind"; source = "/opt/postfix/spool/maildrop"; target = "/var/spool/postfix/maildrop"; })
+      ({ type = "bind"; source = "/opt/postfix/spool/public"; target = "/var/spool/postfix/public"; })
+      ({ type = "bind"; source = "/opt/postfix/lib"; target = "/var/lib/postfix"; })
       ({ type = "tmpfs"; target = "/run"; })
     ];
   };
@@ -348,16 +308,16 @@ in
 
 pkgs.dockerTools.buildLayeredImage rec {
     maxLayers = 124;
-    name = "docker-registry.intr/webservices/apache2-php71";
+    name = "docker-registry.intr/webservices/apache2-php70";
     tag = if gitAbbrev != "" then gitAbbrev else "latest";
-    contents = [ php71 
+    contents = [ php70
                  perl
-                 php71Packages.rrd
-                 php71Packages.redis
-                 php71Packages.timezonedb
-                 php71Packages.memcached
-                 php71Packages.imagick
-                 phpioncubepack
+                 php70Packages.rrd
+                 php70Packages.redis
+                 php70Packages.timezonedb
+                 php70Packages.memcached
+                 php70Packages.imagick
+                 ioncube.v70
                  curl
                  bash
                  coreutils
@@ -379,14 +339,14 @@ pkgs.dockerTools.buildLayeredImage rec {
                  perl528Packages.ListMoreUtilsXS
                  perl528Packages.LWPProtocolHttps
                  mjHttpErrorPages
-                 glibc
                  gcc-unwrapped.lib
                  s6
                  s6-portable-utils
     ];
-      extraCommands = ''
-          chmod 555 ${postfix}/bin/postdrop
-      '';
+      # XXX: chmod: changing permissions of '/nix/store/12s1mkdj8a7sfdc3xy7p8cd7qpkajiiv-postfix-3.4.5/bin/postdrop': Operation not permitted
+      # extraCommands = ''
+      #     chmod 555 ${postfix}/bin/postdrop
+      # '';
    config = {
 #       Entrypoint = [ "${apacheHttpd}/bin/httpd" "-D" "FOREGROUND" "-d" "${rootfs}/etc/httpd" ];
        Entrypoint = [ "/init" ];
