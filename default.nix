@@ -5,13 +5,12 @@ with import <nixpkgs> {
   ];
 };
 
-with lib;
-
 let
 
 inherit (builtins) concatMap getEnv toJSON;
 inherit (dockerTools) buildLayeredImage;
-inherit (lib) concatMapStringsSep firstNChars flattenSet dockerRunCmd mkRootfs;
+inherit (lib) concatMapStringsSep firstNChars flattenSet dockerRunCmd buildPhpPackage mkRootfs;
+inherit (lib.attrsets) collect isDerivation;
 inherit (stdenv) mkDerivation;
 
   locale = glibcLocales.override {
@@ -19,9 +18,19 @@ inherit (stdenv) mkDerivation;
       locales = ["en_US.UTF-8/UTF-8"];
   };
 
+sh = dash.overrideAttrs (_: rec {
+  postInstall = ''
+    ln -s dash "$out/bin/sh"
+  '';
+});
+
   php70 = stdenv.mkDerivation rec {
       version = "7.0.33";
       name = "php-${version}";
+      src = fetchurl {
+             url = "https://www.php.net/distributions/${name}.tar.bz2";
+             inherit sha256;
+      };
       sha256 = "4933ea74298a1ba046b0246fe3771415c84dfb878396201b56cb5333abe86f07";
       enableParallelBuilding = true;
       nativeBuildInputs = [ pkgconfig autoconf ];
@@ -29,7 +38,10 @@ inherit (stdenv) mkDerivation;
         ./patch/php7/fix-paths-php7.patch
         ./patch/php7/php7-apxs.patch
       ];
-
+      stripDebugList = "bin sbin lib modules";
+      outputs = [ "out" "dev" ];
+      doCheck = false;
+      checkTarget = "test";
       buildInputs = [
          autoconf
          automake
@@ -67,9 +79,7 @@ inherit (stdenv) mkDerivation;
          openssl.dev
          glibcLocales
       ];
-
       CXXFLAGS = "-std=c++11";
-
       configureFlags = ''
        --disable-cgi
        --disable-pthreads
@@ -132,9 +142,7 @@ inherit (stdenv) mkDerivation;
        --with-password-argon2=${libargon2}
        --with-apxs2=${apacheHttpd.dev}/bin/apxs
        '';
-
       hardeningDisable = [ "bindnow" ];
-
       preConfigure = ''
         # Don't record the configure flags since this causes unnecessary
         # runtime dependencies
@@ -144,20 +152,14 @@ inherit (stdenv) mkDerivation;
             --replace '@CONFIGURE_OPTIONS@' "" \
             --replace '@PHP_LDFLAGS@' ""
         done
-
         substituteInPlace ext/tidy/tidy.c \
             --replace buffio.h tidybuffio.h
-
         [[ -z "$libxml2" ]] || addToSearchPath PATH $libxml2/bin
-
         export EXTENSION_DIR=$out/lib/php/extensions
-
         configureFlags+=(--with-config-file-path=$out/etc \
           --includedir=$dev/include)
-
         ./buildconf --force
       '';
-
       postFixup = ''
              mkdir -p $dev/bin $dev/share/man/man1
              mv $out/bin/phpize $out/bin/php-config $dev/bin/
@@ -165,109 +167,54 @@ inherit (stdenv) mkDerivation;
              $out/share/man/man1/php-config.1.gz \
              $dev/share/man/man1/
       '';
-
-      src = fetchurl {
-             url = "https://www.php.net/distributions/${name}.tar.bz2";
-             inherit sha256;
-      };
-
-      stripDebugList = "bin sbin lib modules";
-      outputs = [ "out" "dev" ];
-      doCheck = false;
-      checkTarget = "test"; 
   };
 
-  php70Packages.redis = stdenv.mkDerivation rec {
-      name = "redis-4.2.0";
-      src = fetchurl {
-          url = "http://pecl.php.net/get/${name}.tgz";
-          sha256 = "7655d88addda89814ad2131e093662e1d88a8c010a34d83ece5b9ff45d16b380";
-      };  
-      nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php70 ];
-      makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
-      autoreconfPhase = "phpize";  
-      postInstall = ''
-          mkdir -p  $out/etc/php.d
-          echo "extension = $out/lib/php/extensions/redis.so" >> $out/etc/php.d/redis.ini
-      '';
+buildPhp70Package = args: buildPhpPackage ({ php = php70; } // args);
+
+php70Packages = {
+  redis = buildPhp70Package {
+      name = "redis";
+      version = "4.2.0";
+      sha256 = "7655d88addda89814ad2131e093662e1d88a8c010a34d83ece5b9ff45d16b380";
   };
 
-  php70Packages.timezonedb = stdenv.mkDerivation rec {
-      name = "timezonedb-2019.1";
-      src = fetchurl {
-          url = "http://pecl.php.net/get/${name}.tgz";
-          sha256 = "0rrxfs5izdmimww1w9khzs9vcmgi1l90wni9ypqdyk773cxsn725";
-      };
-      nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php70 ];
-      makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
-      autoreconfPhase = "phpize";
-      postInstall = ''
-          mkdir -p  $out/etc/php.d
-          echo "extension = $out/lib/php/extensions/timezonedb.so" >> $out/etc/php.d/timezonedb.ini
-      '';
+  timezonedb = buildPhp70Package {
+      name = "timezonedb";
+      version ="2019.1";
+      sha256 = "0rrxfs5izdmimww1w9khzs9vcmgi1l90wni9ypqdyk773cxsn725";
   };
 
-  php70Packages.rrd = stdenv.mkDerivation rec {
-      name = "rrd-2.0.1";
-      src = fetchurl {
-          url = "http://pecl.php.net/get/${name}.tgz";
-          sha256 = "39f5ae515de003d8dad6bfd77db60f5bd5b4a9f6caa41479b1b24b0d6592715d";
-      };
-      nativeBuildInputs = [ autoreconfHook pkgconfig ] ;
-      buildInputs = [ php70 rrdtool ];
-      makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
-      autoreconfPhase = "phpize";
-      postInstall = ''
-          mkdir -p  $out/etc/php.d
-          echo "extension = $out/lib/php/extensions/rrd.so" >> $out/etc/php.d/rrd.ini
-      '';
+  rrd = buildPhp70Package {
+      name = "rrd";
+      version = "2.0.1";
+      sha256 = "39f5ae515de003d8dad6bfd77db60f5bd5b4a9f6caa41479b1b24b0d6592715d";
+      inputs = [ pkgconfig rrdtool ];
   };
 
-
-  php70Packages.memcached = stdenv.mkDerivation rec {
-      name = "memcached-3.1.3";
-      src = fetchurl {
-          url = "http://pecl.php.net/get/${name}.tgz";
-          sha256 = "20786213ff92cd7ebdb0d0ac10dde1e9580a2f84296618b666654fd76ea307d4";
-      };
-      nativeBuildInputs = [ autoreconfHook ] ;
-      buildInputs = [ php70 pkg-config zlib libmemcached ];
-      makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
-      configureFlags = ''
-          --with-zlib-dir=${zlib.dev}
-          --with-libmemcached-dir=${libmemcached}
-      '';
-      autoreconfPhase = "phpize";
-      postInstall = ''
-          mkdir -p  $out/etc/php.d
-          echo "extension = $out/lib/php/extensions/memcached.so" >> $out/etc/php.d/memcached.ini
-      '';
+  memcached = buildPhp70Package {
+      name = "memcached";
+      version = "3.1.3";
+      sha256 = "20786213ff92cd7ebdb0d0ac10dde1e9580a2f84296618b666654fd76ea307d4";
+      inputs = [ pkgconfig zlib.dev libmemcached ];
+      configureFlags = [
+        "--with-zlib-dir=${zlib.dev}"
+        "--with-libmemcached-dir=${libmemcached}"
+      ];
   };
 
-  php70Packages.imagick = stdenv.mkDerivation rec {
-      name = "imagick-3.4.3";
-      src = fetchurl {
-          url = "http://pecl.php.net/get/${name}.tgz";
-          sha256 = "1f3c5b5eeaa02800ad22f506cd100e8889a66b2ec937e192eaaa30d74562567c";
-      };
-      nativeBuildInputs = [ autoreconfHook pkgconfig ] ;
-      buildInputs = [ php70 imagemagick pcre ];
-      makeFlags = [ "EXTENSION_DIR=$(out)/lib/php/extensions" ];
-      configureFlags = [ "--with-imagick=${pkgs.imagemagick.dev}" ];
-      autoreconfPhase = "phpize";
-      postInstall = ''
-          mkdir -p  $out/etc/php.d
-          echo "extension = $out/lib/php/extensions/imagick.so" >> $out/etc/php.d/imagick.ini
-      '';
+  imagick = buildPhp70Package {
+      name = "imagick";
+      version = "3.4.3";
+      sha256 = "1f3c5b5eeaa02800ad22f506cd100e8889a66b2ec937e192eaaa30d74562567c";
+      inputs = [ pkgconfig imagemagick.dev pcre ];
+      configureFlags = [ "--with-imagick=${imagemagick.dev}" ];
   };
-
+};
 
   rootfs = mkRootfs {
       name = "apache2-php70-rootfs";
       src = ./rootfs;
-      inherit curl coreutils findutils apacheHttpdmpmITK apacheHttpd mjHttpErrorPages php70 postfix s6 execline;
+      inherit curl coreutils findutils apacheHttpdmpmITK apacheHttpd mjHttpErrorPages php70 postfix s6 execline mjperl5Packages;
       ioncube = ioncube.v70;
       s6PortableUtils = s6-portable-utils;
       s6LinuxUtils = s6-linux-utils;
@@ -307,61 +254,55 @@ gitAbbrev = firstNChars 8 (getEnv "GIT_COMMIT");
 in 
 
 pkgs.dockerTools.buildLayeredImage rec {
-    maxLayers = 124;
-    name = "docker-registry.intr/webservices/apache2-php70";
-    tag = if gitAbbrev != "" then gitAbbrev else "latest";
-    contents = [ php70
-                 perl
-                 php70Packages.rrd
-                 php70Packages.redis
-                 php70Packages.timezonedb
-                 php70Packages.memcached
-                 php70Packages.imagick
-                 ioncube.v70
-                 curl
-                 bash
-                 coreutils
-                 findutils
-                 apacheHttpd
-                 apacheHttpdmpmITK
-                 rootfs
-                 execline
-                 tzdata
-                 mime-types
-                 postfix
-                 locale
-                 perl528Packages.Mojolicious
-                 perl528Packages.base
-                 perl528Packages.libxml_perl
-                 perl528Packages.libnet
-                 perl528Packages.libintl_perl
-                 perl528Packages.LWP 
-                 perl528Packages.ListMoreUtilsXS
-                 perl528Packages.LWPProtocolHttps
-                 mjHttpErrorPages
-                 gcc-unwrapped.lib
-                 s6
-                 s6-portable-utils
+  maxLayers = 124;
+  name = "docker-registry.intr/webservices/apache2-php70";
+  tag = if gitAbbrev != "" then gitAbbrev else "latest";
+  contents = [
+    rootfs
+    tzdata
+    locale
+    postfix
+    sh
+    coreutils
+    perl
+         perlPackages.TextTruncate
+         perlPackages.TimeLocal
+         perlPackages.PerlMagick
+         perlPackages.commonsense
+         perlPackages.Mojolicious
+         perlPackages.base
+         perlPackages.libxml_perl
+         perlPackages.libnet
+         perlPackages.libintl_perl
+         perlPackages.LWP
+         perlPackages.ListMoreUtilsXS
+         perlPackages.LWPProtocolHttps
+         perlPackages.DBI
+         perlPackages.DBDmysql
+         perlPackages.CGI
+         perlPackages.FilePath
+         perlPackages.DigestPerlMD5
+         perlPackages.DigestSHA1
+         perlPackages.FileBOM
+         perlPackages.GD
+         perlPackages.LocaleGettext
+         perlPackages.HashDiff
+         perlPackages.JSONXS
+         perlPackages.POSIXstrftimeCompiler
+         perlPackages.perl
+  ] ++ collect isDerivation php70Packages;
+  config = {
+    Entrypoint = [ "${rootfs}/init" ];
+    Env = [
+      "TZ=Europe/Moscow"
+      "TZDIR=${tzdata}/share/zoneinfo"
+      "LOCALE_ARCHIVE_2_27=${locale}/lib/locale/locale-archive"
+      "LC_ALL=en_US.UTF-8"
     ];
-      # XXX: chmod: changing permissions of '/nix/store/12s1mkdj8a7sfdc3xy7p8cd7qpkajiiv-postfix-3.4.5/bin/postdrop': Operation not permitted
-      # extraCommands = ''
-      #     chmod 555 ${postfix}/bin/postdrop
-      # '';
-   config = {
-#       Entrypoint = [ "${apacheHttpd}/bin/httpd" "-D" "FOREGROUND" "-d" "${rootfs}/etc/httpd" ];
-       Entrypoint = [ "/init" ];
-       Env = [
-          "TZ=Europe/Moscow"
-          "TZDIR=/share/zoneinfo"
-          "LOCALE_ARCHIVE_2_27=${locale}/lib/locale/locale-archive"
-          "LC_ALL=en_US.UTF-8"
-          "HTTPD_PORT=8074"
-       ];
-       Labels = flattenSet rec {
-          "ru.majordomo.docker.arg-hints-json" = builtins.toJSON dockerArgHints;
-          "ru.majordomo.docker.cmd" = dockerRunCmd dockerArgHints "${name}:${tag}";
-          "ru.majordomo.docker.exec.reload-cmd" = "${apacheHttpd}/bin/httpd -d ${rootfs}/etc/httpd -k graceful";
-       };
+    Labels = flattenSet rec {
+      ru.majordomo.docker.arg-hints-json = builtins.toJSON dockerArgHints;
+      ru.majordomo.docker.cmd = dockerRunCmd dockerArgHints "${name}:${tag}";
+      ru.majordomo.docker.exec.reload-cmd = "${apacheHttpd}/bin/httpd -d ${rootfs}/etc/httpd -k graceful";
     };
+  };
 }
-
