@@ -28,7 +28,7 @@ sh = dash.overrideAttrs (_: rec {
       name = "apache2-php70-rootfs";
       src = ./rootfs;
       inherit curl coreutils findutils apacheHttpdmpmITK apacheHttpd mjHttpErrorPages php70 postfix s6 execline;
-      perl5lib = mjperl5lib;
+#      perl5lib = mjperl5lib;
       mjperl5Packages = mjperl5lib;
       ioncube = ioncube.v70;
       s6PortableUtils = s6-portable-utils;
