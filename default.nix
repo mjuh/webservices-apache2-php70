@@ -43,6 +43,9 @@ pkgs.dockerTools.buildLayeredImage rec {
     postfix
     sh
     coreutils
+    libjpeg_turbo
+    (optipng.override{ inherit libpng ;})
+    gifsicle
   ]
   ++ collect isDerivation mjperl5Packages
   ++ collect isDerivation phpPackages.php70Packages;
