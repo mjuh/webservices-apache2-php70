@@ -21,7 +21,7 @@ let
     src = ./rootfs;
     inherit curl coreutils findutils apacheHttpdmpmITK apacheHttpd
       mjHttpErrorPages s6 execline;
-                                   postfix = sendmail;
+    postfix = sendmail;
     php70 = php.php70;
     mjperl5Packages = mjperl5lib;
     ioncube = ioncube.v70;
@@ -41,10 +41,11 @@ pkgs.dockerTools.buildLayeredImage rec {
     rootfs
     tzdata
     locale
-                                  sendmail
+    sendmail
     sh
     coreutils
     libjpeg_turbo
+    jpegoptim
     (optipng.override{ inherit libpng ;})
     gifsicle nss-certs.unbundled zip
   ]
