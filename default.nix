@@ -1,9 +1,8 @@
 {}:
 
 with import <nixpkgs> {
-#add_postfix_test
   overlays = [
-    (import (builtins.fetchGit { url = "git@gitlab.intr:_ci/nixpkgs.git"; ref = "master"; }))
+    (import (builtins.fetchGit { url = "git@gitlab.intr:_ci/nixpkgs.git"; ref = (if builtins ? getEnv then builtins.getEnv "GIT_BRANCH" else "master"); }))
   ];
 };
 
@@ -14,15 +13,14 @@ let
   inherit (lib.attrsets) collect isDerivation;
   inherit (stdenv) mkDerivation;
 
-  php70DockerArgHints = lib.phpDockerArgHints php.php70;
+  php70DockerArgHints = lib.phpDockerArgHints php70;
 
   rootfs = mkRootfs {
     name = "apache2-rootfs-php70";
     src = ./rootfs;
     inherit zlib curl coreutils findutils apacheHttpdmpmITK apacheHttpd
-      mjHttpErrorPages s6 execline;
+      mjHttpErrorPages s6 execline php70;
     postfix = sendmail;
-    php70 = php.php70;
     mjperl5Packages = mjperl5lib;
     ioncube = ioncube.v70;
     s6PortableUtils = s6-portable-utils;
@@ -51,10 +49,11 @@ pkgs.dockerTools.buildLayeredImage rec {
     gcc-unwrapped.lib
     glibc
     zlib
-    connectorc perl520
+    mariadbConnectorC
+    perl520
   ]
   ++ collect isDerivation mjperl5Packages
-  ++ collect isDerivation phpPackages.php70Packages;
+  ++ collect isDerivation php70Packages;
   config = {
     Entrypoint = [ "${rootfs}/init" ];
     Env = [
