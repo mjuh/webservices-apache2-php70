@@ -18,6 +18,12 @@ Linux and macOS:
 docker load --input $(nix-build --argstr overlayUrl https://github.com/mjuh/ci-nixpkgs.git --no-out-link)
 ```
 
+Hint: If you failed to build with your current nixpkgs version, try to
+build with a tested [nixpkgs](https://github.com/NixOS/nixpkgs "Nix
+Packages collection") version.
+
+[![Build Status](https://jenkins.majordomo.ru/job/webservices/job/apache2-php70/job/master/lastBuild/badge/icon?config=webservices-apache2-php70)](https://jenkins.majordomo.ru/job/webservices/job/apache2-php70/job/master/lastBuild/badge/icon?config=webservices-apache2-php70)
+
 ## Using Apache PHP 7.0
 
 To use Apache PHP 7.0, call:
