@@ -7,11 +7,11 @@
         "nixpkgs-stable": "nixpkgs-stable"
       },
       "locked": {
-        "lastModified": 1607440783,
-        "narHash": "sha256-bSOkB4JFhxLP6Mhlra6/lp2IgB8MAOrZIgiXwDb/p54=",
+        "lastModified": 1611654811,
+        "narHash": "sha256-LWqSaQWYeA9LvH3SUJkdf4fdAZj1oen9t2VvbFFBfkY=",
         "ref": "master",
-        "rev": "b72e972a40291421e39917ca5d76cb1eda10b325",
-        "revCount": 785,
+        "rev": "96f38df67a16e24126e9dc7fbd957ee9ac1aee41",
+        "revCount": 786,
         "type": "git",
         "url": "https://gitlab.intr/_ci/nixpkgs"
       },
