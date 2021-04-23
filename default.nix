@@ -80,6 +80,8 @@ pkgs.dockerTools.buildLayeredImage rec {
       mkdir -p bin
       mkdir -p usr/local
       mkdir -p opt
+      chmod 755 bin
+      ln -s ${nodePackages.svgo}/bin/svgo bin/svgo
       ln -s ${php70} opt/php70
       ln -s /bin usr/bin
       ln -s /bin usr/sbin
