@@ -50,6 +50,9 @@ pkgs.dockerTools.buildLayeredImage rec {
     logger
     perl520
     fontconfig.out
+    gifsicle
+    ghostscript
+    nodePackages.svgo
   ]
   ++ collect isDerivation mjperl5Packages
   ++ collect isDerivation php70Packages;
